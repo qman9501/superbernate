@@ -11,6 +11,7 @@
     <module>supernate.core</module>
     <module>supernate.oscarDialect</module>
     <module>supernate.mysqlDialect</module>
+    <module>supernate.oracleDialect</module>
   </modules>
   <dependencies>
   	<dependency>
