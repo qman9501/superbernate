@@ -13,12 +13,15 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.map.CaseInsensitiveMap;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import supernate.core.tags.AutoGen;
 import supernate.core.tags.Column;
 import supernate.core.tags.Key;
 import supernate.core.tags.Table;
@@ -30,7 +33,7 @@ import supernate.core.tags.Table;
  */
 @Table
 public abstract class TableInfo{
-	private static final Logger logger = LogManager.getLogger("supernate");
+	protected static final Logger logger = LogManager.getLogger("supernate");
 	
 	/**
 	 * @throws Exception
@@ -51,6 +54,15 @@ public abstract class TableInfo{
 	public List<Map<String,Object>> QueryByKey(Entity et,Object...objects){
 		return et.QueryToMap("select * from "+this.getTableName()+" where "+this.keyColumn.getName()+" =?", objects);
 	}
+	
+	public ColumnInfo getColumnInfo(String name) {
+		int idx = columns.lastIndexOf(name);
+		if(idx>=0)
+			return columns.get(columns.lastIndexOf(name));
+		else
+			return null;
+	}
+	
 	public boolean Save(Entity et,Map<String,Object> columnvalues) {
 		try {
 			CaseInsensitiveMap<String,Object> map = new CaseInsensitiveMap();
@@ -143,56 +155,33 @@ public abstract class TableInfo{
 		}
 	}
 	
-	protected abstract ColumnInfo getColumnInfo(Field field);
+	protected abstract void initColumnInfo(Field field);
 
 	protected void initcolumns(Class z) {
-		List<ColumnInfo> ret = new ArrayList<ColumnInfo>();
 		Field[] fields = z.getDeclaredFields();
 		Field[] fields2 = z.getFields();
 		Class a = z.getSuperclass();
 		String fi= "";
 		for(int i = 0;i<fields.length;i++) {
-			ColumnInfo temp = getColumnInfo(fields[i]);
-			if(temp!=null) {
-				ret.add(temp);
-				if(temp.isKey())
-					this.keyColumn = temp;
-				fi+=","+temp.getFieldName()+",";
-			}
+			initColumnInfo(fields[i]);
 		}
 		for(int i = 0;i<fields2.length;i++) {
-			ColumnInfo temp = getColumnInfo(fields2[i]);
-			if(temp!=null) {
-				ret.add(temp);
-				fi+=","+temp.getFieldName()+",";
-			}
+			initColumnInfo(fields[i]);
 		}
 		fields = a.getDeclaredFields();
 		fields2 = a.getFields();
 		for(int i = 0;i<fields.length;i++) {
-			String tempname =fields[i].getName();
-			if(fi.contains(","+tempname+","))
-				continue;
-			ColumnInfo temp = getColumnInfo(fields[i]);
-			if(temp!=null) {
-				ret.add(temp);
-				if(temp.isKey())
-					this.keyColumn = temp;
-			}
+			initColumnInfo(fields[i]);
 		}
 		for(int i = 0;i<fields2.length;i++) {
-			String tempname =fields2[i].getName();
-			if(fi.contains(","+tempname+","))
-				continue;
-			ColumnInfo temp = getColumnInfo(fields2[i]);
-			if(temp!=null)ret.add(temp);
+			initColumnInfo(fields[i]);
 		}
-		this.columns = ret;
 	}
 
 	private ConnectionInfo connectionInfo = null;
 	@Column()
-	@Key(autogen=true)
+	@Key()
+	@AutoGen()
 	private Integer id;
 	/**
 	 * @return the id
@@ -210,6 +199,7 @@ public abstract class TableInfo{
 	@Column(length="50")
 	protected String tableName = "";
 	protected List<ColumnInfo> columns = new ArrayList<ColumnInfo>();
+	protected List<ColumnInfo> autos = new ArrayList<ColumnInfo>();
 	protected ColumnInfo keyColumn = null;
 	/**
 	 * @return the aiColumn
@@ -319,5 +309,7 @@ public abstract class TableInfo{
 			throw new Exception("未定义主键，或定义过滤条件！");
 		return "delete "+this.getTableName()+" where "+(where==null||where.equals("")?(getKeyColumn().name+"=?"):where);
 	}
+	
+	protected abstract String getHisFunction();
 }
 

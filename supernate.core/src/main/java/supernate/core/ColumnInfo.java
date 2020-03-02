@@ -13,6 +13,7 @@ import org.springframework.util.ReflectionUtils;
 
 import com.sxkj.jutils.TimestampHelper;
 
+import supernate.core.tags.AutoGen;
 import supernate.core.tags.Column;
 import supernate.core.tags.Key;
 import supernate.core.tags.Table;
@@ -184,19 +185,6 @@ import supernate.core.tags.Table;
 			this.id = id;
 		}
 
-		/**
-		 * @return the tableid
-		 */
-		public int getTableid() {
-			return tableid;
-		}
-
-		/**
-		 * @param tableid the tableid to set
-		 */
-		public void setTableid(int tableid) {
-			this.tableid = tableid;
-		}
 		@Column(name="COLUMNNAME")
 		protected String name;
 		@Column(name="ISAI")
@@ -216,10 +204,11 @@ import supernate.core.tags.Table;
 		
 		protected Object value;
 		@Column(name="ID")
-		@Key(autogen=true)
+		@Key()
+		@AutoGen()
 		protected Integer id;
 		@Column
-		protected int tableid;
+		protected String tableName;
 		
 		@Column
 		protected int key;
@@ -241,9 +230,6 @@ import supernate.core.tags.Table;
 		public void setSqlType(String sqlType) {
 			this.sqlType = sqlType;
 		}
-
-		@Column
-		protected String tableName;
 		
 		public String getTableName() {
 			return tableName.toUpperCase();
@@ -332,5 +318,20 @@ import supernate.core.tags.Table;
 				return null;
 			}
 		}
-		public abstract String getIndexSql();
+		public abstract String getIndexSql(boolean ishistory);
+		public abstract String getSqlString(boolean ishistory);
+		
+		@Override
+		public boolean equals(Object columnInfo) {
+			return columnInfo.toString().toLowerCase().contains(this.getName().toLowerCase());
+		}
+		
+		@Override
+		public String toString() {
+			return this.getName();
+		}
+		
+		public abstract Object getAutoValue(Entity et);
+		
+		public abstract String getAutoFunctioin();
 	}

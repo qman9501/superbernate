@@ -2,9 +2,13 @@ package supernate.oracleDialect;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 import com.sxkj.jutils.TimestampHelper;
 
+import supernate.core.Entity;
 import supernate.core.tags.Column;
 import org.springframework.util.ReflectionUtils;
 
@@ -48,8 +52,9 @@ public class ColumnInfo extends supernate.core.ColumnInfo{
 				break;
 		}
 	}
-	
-	public String getSqlString() {
+
+	@Override
+	public String getSqlString(boolean ishistory) {
 		String ret="";
 		switch(this.getType()) {
 		case 0:
@@ -65,20 +70,46 @@ public class ColumnInfo extends supernate.core.ColumnInfo{
 		if(this.getNullable()!=1) {
 			ret+= " NOT NULL";
 		}
-		if(this.isKey()) {
+		if(this.isKey()&&(!ishistory)) {
 			ret+=",\r\nCONSTRAINT "+this.getTableName()+"_PK PRIMARY KEY ("+this.getName()+")";
 		}else
-		if(this.isUnique()) {
+		if(this.isUnique()&&(!ishistory)) {
 			ret+=",\r\nCONSTRAINT "+this.getTableName()+this.getName()+"+UN UNIQUE ("+this.getName()+")";
 		}
 		return ret;
 	}
-	
-	public String getIndexSql() {
+
+	@Override
+	public String getIndexSql(boolean ishistory) {
 		if(this.isIndex()) {
-			return "CREATE INDEX "+this.getTableName()+"_IDX_"+this.getName()+" ON "+this.getTableName().toUpperCase()+" USING BTREE("+this.getName()+") INIT 64K NEXT 64K MAXSIZE UNLIMITED FILL 70 SPLIT 50;";
+			return "CREATE INDEX "+this.getTableName()+(ishistory?"_HIS":"")+"_IDX_"+this.getName()+" ON "+this.getTableName().toUpperCase()+(ishistory?"_HIS":"")+" USING BTREE("+this.getName()+") INIT 64K NEXT 64K MAXSIZE UNLIMITED FILL 70 SPLIT 50;";
 		}
 		return "";
 	}
 	
+	@Override
+	public Object getAutoValue(Entity et) {
+		Object ret = null;
+		Statement stkey;
+		try {
+			stkey = et.getConn().createStatement();
+		    ResultSet rs=stkey.executeQuery("select "+this.getTableName()+"_SEQUENCE.nextval from dual");
+		    if(rs.next()){
+		    	ret=rs.getObject(1);
+	        }
+		    rs.close();
+		    stkey.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			
+		}
+		return ret;
+	}
+
+	@Override
+	public String getAutoFunctioin() {
+		// TODO Auto-generated method stub
+		return "CREATE SEQUENCE "+this.tableName.toUpperCase()+"_"+this.getName()+"_SEQUENCE INCREMENT 1 MINVALUE 1 START 1 NO CACHE  NO CYCLE;";
+	}
 }
