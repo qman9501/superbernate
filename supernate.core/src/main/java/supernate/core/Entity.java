@@ -36,8 +36,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 @SuppressWarnings("unchecked")
 public class Entity<T> {
 	private static final Logger logger = LogManager.getLogger("supernate");
-	@Autowired
-	private transient SJpa jpaconf;
+	private transient String dialectPackage;
+	public String getDialectPackage() {
+		return dialectPackage;
+	}
+	public void setDialectPackage(String dialectPackage) {
+		this.dialectPackage = dialectPackage;
+		try {
+			Class cla = Class.forName(this.dialectPackage+".TableInfo");
+			this.baseTableInfo = (TableInfo)cla.newInstance();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			logger.error(e.getMessage());
+		}
+	}
+
 	private transient TableInfo baseTableInfo = null;
 	
 	private transient boolean initclass = false;
@@ -63,17 +77,9 @@ public class Entity<T> {
 		if(z==Entity.class) {
 			return;
 		}
-		this.tableInfo = this.baseTableInfo.initWithClass(z);
-		if(tableInfo.getConnectionInfo()!=null) {
-			try {
-				this.conn = DriverManager.getConnection(tableInfo.getConnectionInfo().getUrl(), tableInfo.getConnectionInfo().getUsername(), tableInfo.getConnectionInfo().getPassword());
-			} catch (SQLException e) {
-				// TODO Auto-generated catch block
-				logger.log(Level.ERROR,e.getMessage());
-			}
-		}
 	}
-	public Entity(Connection conn)  {
+	public Entity(Connection conn,String packageStr)  {
+		this.setDialectPackage(packageStr);
 		init();
 		Class z = this.getClass();
 		this.conn = conn;
@@ -82,8 +88,9 @@ public class Entity<T> {
 		}
 		this.tableInfo = this.baseTableInfo.initWithClass(z);
 	}
-	public Entity(String driver,String url,String username,String password) throws Exception {
+	public Entity(String url,String username,String password,String packageStr) throws Exception {
 
+		this.setDialectPackage(packageStr);
 		init();
 		Class z = this.getClass();
 		this.conn = DriverManager.getConnection(url, username, password);
@@ -95,8 +102,17 @@ public class Entity<T> {
 	
 	private void init() {
 		try {
-			Class cla = Class.forName(this.jpaconf.dialect);
-			this.baseTableInfo = (TableInfo)cla.newInstance();
+			if(this.dialectPackage!=null) {
+				Class cla = Class.forName(this.dialectPackage+".TableInfo");
+				this.baseTableInfo = (TableInfo)cla.newInstance();
+				Class.forName(this.baseTableInfo.getClassDriver());
+			}
+			Class z=this.getClass();
+			if(z.isAnnotationPresent(supernate.core.tags.ConnectionInfo.class)) {
+				supernate.core.tags.ConnectionInfo connectionInfo = (supernate.core.tags.ConnectionInfo)z.getAnnotation(supernate.core.tags.ConnectionInfo.class);
+				
+				this.conn = DriverManager.getConnection(connectionInfo.url(), connectionInfo.username(), connectionInfo.password());
+			}
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			logger.log(Level.ERROR, e.getMessage());
@@ -115,7 +131,14 @@ public class Entity<T> {
 	}
 	
 	public void InitTable(boolean createhis) {
+		if(this.baseTableInfo==null) {
+			logger.log(Level.ERROR, "There are no Dialect!");
+			return;
+		}
 		Class z = this.getClass();
+		if(this.tableInfo==null) {
+			this.tableInfo = this.baseTableInfo.initWithClass(z);
+		}
 		List<String> sqls = this.tableInfo.getInitSql(createhis);
 		try {
 		this.conn.setAutoCommit(false);
@@ -178,200 +201,50 @@ public class Entity<T> {
 		}
 	}
 	
-	public void insert() throws Exception {
-		String sql = this.tableInfo.getInsertSql();
-		PreparedStatement st = null;
-		Class<?> z = this.getClass();
-		if(this.tableInfo.getKeyColumn()!=null) {
-				Object tempkey = ModelRef.getFieldValue(this,this.tableInfo.getKeyColumn().fieldName);
-				if(tempkey==null) {
-				    Statement stkey = conn.createStatement();
-				    ResultSet rs=stkey.executeQuery("select "+this.tableInfo.getTableName()+"_SEQUENCE.nextval from dual");
-				    if(rs.next()){
-				    	tempkey = rs.getObject(1);
-			        }
-				    Object key = null;
-				    if(tableInfo.getKeyColumn().getType()==0) {
-				    	key = Integer.parseInt(tempkey.toString());
-				    }else {
-				    	key = tempkey;
-				    }
-				    ModelRef.setFieldValue(this,this.tableInfo.getKeyColumn().fieldName,key);
-				    //field.set(this, key);
-				    stkey.close();
-				}
-		}
-		st = conn.prepareStatement(sql);
-		List<ColumnInfo> columns = this.tableInfo.getColumns();
-		int count = 0;
-		for(int i = 0;i<columns.size();i++) {
-				st.setObject(count+1, ModelRef.getFieldValue(this,columns.get(i).fieldName));
-				count++;
-		}
-		st.executeUpdate();
-		st.close();
+	public void insert(){
+		TableInfo tableInfo = baseTableInfo.initWithObject(this);
+		tableInfo.setEntity(this);
+		tableInfo.Insert();
 	}	
 	
-	public void insert(Object t) throws Exception {
-		Class z = t.getClass();
-		TableInfo tableinfo= baseTableInfo.initWithClass(z);
-		String sql = tableinfo.getInsertSql();
-		PreparedStatement st = null;
-		if(tableinfo.getKeyColumn()!=null){
-			Object tempkey = ModelRef.getFieldValue(t,tableinfo.getKeyColumn().fieldName);
-			if(tempkey==null) {
-			    Statement stkey = conn.createStatement();
-			    ResultSet rs=stkey.executeQuery("select "+tableinfo.getTableName()+"_SEQUENCE.nextval from dual");
-			    if(rs.next()){
-			    	tempkey = rs.getObject(1);
-		        }
-			    Object key = null;
-			    if(tableinfo.getKeyColumn().getType()==0) {
-			    	key = Integer.parseInt(tempkey.toString());
-			    }else {
-			    	key = tempkey;
-			    }
-			    ModelRef.setFieldValue(t,tableinfo.getKeyColumn().fieldName,key);
-			    //field.set(t, key);
-			    stkey.close();
-			}
-		}
-		st = conn.prepareStatement(sql);
-		List<ColumnInfo> columns = tableinfo.getColumns();
-		int count = 0;
-		for(int i = 0;i<columns.size();i++) {
-			Field field = ModelRef.getDeclaredField(t, columns.get(i).getFieldName());
-				//Field field = z.getDeclaredField(columns.get(i).getFieldName());
-				//field.setAccessible(true);
-			Object tt = ModelRef.getFieldValue(t,columns.get(i).fieldName);
-			if(t.getClass().getSimpleName().toLowerCase().contains("date")&&tt!=null) {
-				Date d = (Date)tt;
-				Timestamp ts = new Timestamp(d.getTime());
-				st.setObject(count+1, ts);
-			}else {
-				st.setObject(count+1, columns.get(i).getValueWithObj(5));
-			}
-				count++;
-		}
-		st.executeUpdate();
-		st.close();
+	public void insert(Object t){
+		TableInfo tableInfo = baseTableInfo.initWithObject(t);
+		tableInfo.setEntity(this);
+		tableInfo.Insert();
 	}	
 	
-	public void update() throws Exception {
-		String sql = this.tableInfo.getUpdateSql(null);
-		PreparedStatement st = null;
-		st = conn.prepareStatement(sql);
-		List<ColumnInfo> columns = this.tableInfo.getColumns();
-		int count = 1;
-		Class<?> z = this.getClass();
-		Object keyvalue = null;
-		for(int i = 0;i<columns.size();i++) {
-			//Field field = ModelRef.getDeclaredField(this, columns.get(i).getFieldName());
-			//field.setAccessible(true);
-			if(!columns.get(i).isAi()) {
-				st.setObject(count, columns.get(i).getValueWithObj(this));
-				count++;
-			}else {
-				keyvalue =columns.get(i).getValueWithObj(this);
-			}
-		}
-		if(tableInfo.getKeyColumn()!=null) {
-			st.setObject(count, keyvalue);
-		}
-		st.executeUpdate();
-		st.close();
+	public void update(){
+		TableInfo tableInfo = baseTableInfo.initWithObject(this);
+		tableInfo.setEntity(this);
+		tableInfo.Update();
 	}
 	
-	public void update(Object t) throws Exception {
-		Class z = t.getClass();
-		TableInfo tableinfo= baseTableInfo.initWithClass(z);
-		String sql = tableinfo.getUpdateSql(null);
-		PreparedStatement st = null;
-		st = conn.prepareStatement(sql);
-		List<ColumnInfo> columns = tableinfo.getColumns();
-		int count = 1;
-		Object keyvalue = null;
-		for(int i = 0;i<columns.size();i++) {
-			//Field field = ModelRef.getDeclaredField(t, columns.get(i).getFieldName());
-			//field.setAccessible(true);
-			if(!columns.get(i).isKey()) {
-				st.setObject(count, columns.get(i).getValueWithObj(t));
-				count++;
-			}else {
-				keyvalue =columns.get(i).getValueWithObj(this);
-			}
-		}
-		if(tableinfo.getKeyColumn()!=null) {
-			st.setObject(count, keyvalue);
-		}
-		st.executeUpdate();
-		st.close();
+	public void update(Object t){
+		TableInfo tableInfo = baseTableInfo.initWithObject(t);
+		tableInfo.setEntity(this);
+		tableInfo.Update();
 	}
 
-	public void update(String where,Object...objects) throws Exception {
-		String sql = this.tableInfo.getUpdateSql(where);
-		PreparedStatement st = null;
-		st = conn.prepareStatement(sql);
-		List<ColumnInfo> columns = this.tableInfo.getColumns();
-		int count = 1;
-		Class<?> z = this.getClass();
-		for(int i = 0;i<columns.size();i++) {
-			//Field field = ModelRef.getDeclaredField(this, columns.get(i).getFieldName());
-			//field.setAccessible(true);
-			if(!columns.get(i).isAi()) {
-				st.setObject(count,columns.get(i).getValueWithObj(this));
-				count++;
-			}
-		}
-        if(objects!=null&&objects.length>0) {
-        	for(int i = 0;i<objects.length;i++) {
-				st.setObject(count, objects[i]);
-				count++;
-        	}
-        }
-		st.executeUpdate();
-		st.close();
+	public void update(String where,Object...objects){
+		TableInfo tableInfo = baseTableInfo.initWithObject(this);
+		tableInfo.setEntity(this);
+		tableInfo.Update(where,objects);
 	}
-	
-//	public void updateByTableInfo(TableInfo tableinfo) throws Exception {
-//		String sql = tableinfo.getUpdateSql(null);
-//		PreparedStatement st = null;
-//		st = conn.prepareStatement(sql);
-//		List<ColumnInfo> columns = tableinfo.getColumns();
-//		Object[] o = new Object[columns.size()];
-//		int i = 0;
-//		for(ColumnInfo co:columns) {
-//			if(!co.isAi()) {
-//				Object ot = co.getValue();
-//				o[i]=ot;
-//				i++;
-//			}
-//		}
-//		o[o.length-1]=tableinfo.getAiColumn().getValue();
-//		st.executeUpdate();
-//		st.close();
-//	}
 
-	public void delete(String where,Object...objects) throws Exception {
-		String sql = this.tableInfo.getDeleteSql(where);
-		try {
-			this.Excutesql(sql, objects);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			logger.log(Level.ERROR, e.getMessage());
-		}
+	public void delete(String where,Object...objects){
+		TableInfo tableInfo = baseTableInfo.initWithObject(this);
+		tableInfo.setEntity(this);
+		tableInfo.Delete(where,objects);
 	}
 	public void delete(Object t) {
-		String sql;
-		try {
-			Class z = t.getClass();
-			TableInfo tableinfo= baseTableInfo.initWithClass(z);
-			sql = tableinfo.getDeleteSql(null);
-			this.Excutesql(sql, tableinfo.getKeyColumn().getValueWithObj(t));
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			logger.log(Level.ERROR, e.getMessage());
-		}
+		TableInfo tableInfo = baseTableInfo.initWithObject(t);
+		tableInfo.setEntity(this);
+		tableInfo.Delete();
+	}
+	public void delete() {
+		TableInfo tableInfo = baseTableInfo.initWithObject(this);
+		tableInfo.setEntity(this);
+		tableInfo.Delete();
 	}
 	
 	public T getByKey(Object id){
@@ -463,12 +336,13 @@ public class Entity<T> {
 	}
 	public PageRecords<T> getObjectsByPage(String where,int pageNum,int pageSize,Object...objects) throws Exception {
 		String sql = "";
+		String pagesql = this.baseTableInfo.getPageSql();
 		int startNumber = (pageNum-1)*pageSize+1;
 		int endNumber = pageNum*pageSize;
 		PreparedStatement st = null;
 		if(where!=null) {
 			if(startNumber>0) {
-				sql = "SELECT * FROM ( SELECT A.*, ROWNUM RN  FROM (SELECT * FROM "+this.tableInfo.getTableName()+" where "+where+") A  WHERE ROWNUM <= ?)WHERE RN >= ?";
+				sql = pagesql.replaceAll("{sql}", "SELECT * FROM "+this.tableInfo.getTableName()+" where "+where);
 				st = conn.prepareStatement(sql);
 				for(int i = 0;i<objects.length;i++) {
 					st.setObject(i+1,objects[i]);
@@ -481,7 +355,7 @@ public class Entity<T> {
 			}
 		}else {
 			if(startNumber>0) {
-				sql = "SELECT * FROM ( SELECT A.*, ROWNUM RN  FROM (SELECT * FROM "+this.tableInfo.getTableName()+") A  WHERE ROWNUM <= ?)WHERE RN >= ?";
+				sql = pagesql.replaceAll("{sql}", "SELECT * FROM "+this.tableInfo.getTableName());
 				st = conn.prepareStatement(sql);
 				st.setObject(1,endNumber);
 				st.setObject(2,startNumber);
@@ -567,9 +441,6 @@ public class Entity<T> {
 		return ret;
 	}
 	
-	public void delete() {
-		this.delete(this);
-	}
 	
 	public void Excutesql(String sql,Object...objects) {
 		try {
@@ -587,10 +458,9 @@ public class Entity<T> {
 			}
 			st.execute();
 			st.close();
-		}catch(Exception ex) {
-			System.out.println("----------------------------");
+		}catch(SQLException ex) {
 			System.out.println(sql);
-			logger.log(Level.ERROR, ex.getMessage());
+			logger.error(ex);
 			
 		}
 	}
@@ -617,8 +487,18 @@ public class Entity<T> {
 			}
 			st.close();
 			return ret;
-		}catch(Exception e) {
+		}catch(SQLException e) {
 			logger.log(Level.ERROR, e.getMessage());
+			return null;
+		} catch (InstantiationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			logger.error(e);
+			return null;
+		} catch (IllegalAccessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			logger.error(e);
 			return null;
 		}
 	}
@@ -681,7 +561,7 @@ public class Entity<T> {
 			}
 			st.close();
 			return ret;
-		}catch(Exception e) {
+		}catch(SQLException e) {
 			logger.log(Level.ERROR, e.getMessage());
 			return null;
 		}
@@ -712,7 +592,7 @@ public class Entity<T> {
 			}
 			st.close();
 			return ret;
-		}catch(Exception e) {
+		}catch(SQLException e) {
 			logger.log(Level.ERROR, e.getMessage());
 			return null;
 		}
@@ -737,7 +617,7 @@ public class Entity<T> {
 			}
 			st.close();
 			return ret;
-		}catch(Exception e) {
+		}catch(SQLException e) {
 			logger.log(Level.ERROR, e.getMessage());
 			return 0;
 		}

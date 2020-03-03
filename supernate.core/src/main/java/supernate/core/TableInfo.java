@@ -43,17 +43,78 @@ public abstract class TableInfo{
 		// TODO Auto-generated constructor stub
 	}
 	
-	protected abstract TableInfo initWithClass(Class z);
+	protected TableInfo initWithClass(Class z) {
+		TableInfo ret=null;
+		try {
+			ret = this.getClass().newInstance();
+			Class<?> clazz = z ; 
+			for(; clazz != Object.class ; clazz = clazz.getSuperclass()) {  
+	            try {  
+	        		if(clazz.isAnnotationPresent(Table.class)) {
+	        			Table tableinfo = (Table) clazz.getAnnotation(Table.class);
+	        			if(!tableinfo.name().equals("")) {
+	        				ret.setTableName(tableinfo.name());
+	        			}else {
+	        				ret.setTableName(clazz.getSimpleName());
+	        			}
+	        			ret.setComment(tableinfo.comment());
+	        		}
+	            } catch (Exception e) {  
+	                //这里甚么都不能抛出去。  
+	                //如果这里的异常打印或者往外抛，则就不会进入                  
+	            }   
+	        }  
+			if(ret.getTableName().equals("")) {
+				logger.error("there's no table tag,please add it to class tag");
+			}
+			ret.initcolumns(z);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			logger.error(e);
+			e.printStackTrace();
+		}
+		return ret;
+	}
 	
-	protected abstract TableInfo initWithDatabase(Entity et,int id);
+	protected TableInfo initWithObject(Object obj) {
+		TableInfo ret = null;
+		Class<?> clazz = obj.getClass() ; 
+		ret = initWithClass(clazz);
+		for(int i = 0;i<ret.getColumns().size();i++) {
+			ColumnInfo co = (ColumnInfo)ret.getColumns().get(i);
+			co.setValueWithObj(obj);
+		}
+		return ret;
+	}
+	
+	protected TableInfo initWithDatabase(int id) {
+		TableInfo ret = null;
+		try {
+			ret = this.getClass().newInstance();
+			Entity<TableInfo> ti = new Entity<TableInfo>(entity.getConn(),entity.getDialectPackage());
+			ret = ti.getByClassKey(TableInfo.class,id);
+			Entity<ColumnInfo> cos = new Entity<ColumnInfo>(entity.getConn(),entity.getDialectPackage());
+			List<ColumnInfo> colist = cos.getObjects(ColumnInfo.class,"tablename=?", ret.getTableName());
+			for(int i = 0;i<colist.size();i++) {
+				ColumnInfo co = colist.get(i);
+				columns.add(co);
+				if(co.isAi()) {
+					autos.add(co);
+				}
+				if(co.isKey()) {
+					keyColumn = co;
+				}
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        return ret;
+	}
 	
 	protected abstract Object getKeyValue(Entity et);
 	
 	protected abstract List<String> getInitSql(boolean createhis);
-	
-	public List<Map<String,Object>> QueryByKey(Entity et,Object...objects){
-		return et.QueryToMap("select * from "+this.getTableName()+" where "+this.keyColumn.getName()+" =?", objects);
-	}
 	
 	public ColumnInfo getColumnInfo(String name) {
 		int idx = columns.lastIndexOf(name);
@@ -63,96 +124,78 @@ public abstract class TableInfo{
 			return null;
 	}
 	
-	public boolean Save(Entity et,Map<String,Object> columnvalues) {
-		try {
-			CaseInsensitiveMap<String,Object> map = new CaseInsensitiveMap();
-			map.putAll(columnvalues);
-			String cc = "";
-			Object[] obs = new Object[columnvalues.size()];
-			int i = 0;
-			boolean flag = false;
-			Object t = map.get(this.keyColumn.name);
-			if(t==null) {
-				flag = true;
-			}
-			String cc1 = "";
-			for(ColumnInfo co:this.columns) {
-				if(!co.isKey()) {
-					obs[i]=map.get(co.name);
-					i++;
+	public void Delete() {
+		this.Delete(null);
+	}
+	
+	public void Delete(String where,Object... params) {
+			try {
+				if(where==null) {
+					String sql = this.getDeleteSql(null);
+					entity.Excutesql(sql, new Object[] {this.keyColumn.getValue()});
 				}else {
-					if(flag) {
-						Statement stkey = et.getConn().createStatement();
-					    ResultSet rs=stkey.executeQuery("select "+this.getTableName()+"_SEQUENCE.nextval from dual");
-					    if(rs.next()){
-					    	obs[i]=rs.getObject(1);
-				        }
-					    rs.close();
-					    stkey.close();
-						i++;
-					}else {
-						obs[obs.length-1]=map.get(co.name);
-					}
+					String sql = this.getDeleteSql(where);
+					entity.Excutesql(sql, params);
+				}
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	}
+	
+	public void Update() {
+		Update(null);
+	}
+	
+	public void Update(String where,Object... params) {
+		try {
+			String sql = "";
+			Object[] pas = null;
+			if(where==null) {
+				sql =  this.getUpdateSql(null);
+				pas = new Object[this.getColumns().size()];
+				int i = 0;
+				for(ColumnInfo co:this.columns) {
+					pas[i]=co.getValue();
+					i++;
+				}
+			}else {
+				sql = this.getUpdateSql(where);
+				pas = new Object[this.getColumns().size()+params.length];
+				int i = 0;
+				for(ColumnInfo co:this.columns) {
+					pas[i]=co.getValue();
+					i++;
+				}
+				for(Object ob:params) {
+					pas[i]=ob;
+					i++;
 				}
 			}
-			if(flag) {
-				et.Excutesql(this.getInsertSql(), obs);
-			}else {
-				et.Excutesql(this.getUpdateSql(null), obs);
-			}
-			return true;
-		}catch(Exception e) {
-			logger.log(Level.ERROR, e.getMessage());
-			return false;
+			entity.Excutesql(sql, pas);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			logger.error(e);
 		}
 	}
-	public boolean Save(Entity et) {
-		try {
-			String cc = "";
-			Object[] obs = new Object[this.columns.size()];
-			int i = 0;
-			boolean flag = false;
-			String cc1 = "";
-			if(this.getKeyColumn()==null)
-				throw new Exception("请设定表主键！");
-			else {
-				Object temp = this.getKeyColumn().getValue();
-				Object v = ModelRef.paseType("int", temp);
-				if(v==null) {
-					Statement stkey = et.getConn().createStatement();
-				    ResultSet rs=stkey.executeQuery("select "+this.getTableName()+"_SEQUENCE.nextval from dual");
-				    if(rs.next()){
-				    	this.getKeyColumn().setValue(rs.getObject(1));
-			        }
-				    rs.close();
-				    stkey.close();
-				    flag=true;
+
+	public void Insert() {
+		String sql = this.getInsertSql();
+		Object[] params = new Object[this.columns.size()];
+		int i = 0;
+		for(ColumnInfo co:this.columns) {
+			Object temp = co.getValue();
+			if(co.getValue()==null) {
+				if(co.isAi()) {
+					temp = co.getAutoValue(entity);
+					co.setValue(temp);
 				}
 			}
-			int aiindex = 0;
-			for(ColumnInfo co:this.columns) {
-				if(!co.isAi()) {
-					obs[i]=co.getValue();
-					i++;
-				}else {
-					if(flag) {
-						obs[i]=co.getValue();
-						i++;
-					}
-				}
-			}
-			
-			if(flag) {
-				et.Excutesql(this.getInsertSql(), obs);
-			}else {
-				obs[obs.length-1]=this.getKeyColumn().getValue();
-				et.Excutesql(this.getUpdateSql(null), obs);
-			}
-			return true;
-		}catch(Exception e) {
-			logger.log(Level.ERROR, e.getMessage());
-			return false;
+			params[i] = temp;
+			i++;
 		}
+		entity.Excutesql(sql, params);
 	}
 	
 	protected abstract void initColumnInfo(Field field);
@@ -178,7 +221,6 @@ public abstract class TableInfo{
 		}
 	}
 
-	private ConnectionInfo connectionInfo = null;
 	@Column()
 	@Key()
 	@AutoGen()
@@ -216,18 +258,6 @@ public abstract class TableInfo{
 
 	@Column(nullable=true)
 	private String comment = "";
-	/**
-	 * @return the connectionInfo
-	 */
-	public ConnectionInfo getConnectionInfo() {
-		return connectionInfo;
-	}
-	/**
-	 * @param conn the connectionInfo to set
-	 */
-	public void setConnectionInfo(ConnectionInfo connectionInfo) {
-		this.connectionInfo = connectionInfo;
-	}
 	/**
 	 * @return the tableName
 	 */
@@ -272,6 +302,16 @@ public abstract class TableInfo{
 		this.comment = comment;
 	}
 	
+	private Entity entity;
+	
+	public Entity getEntity() {
+		return entity;
+	}
+
+	public void setEntity(Entity entity) {
+		this.entity = entity;
+	}
+
 	public String getInsertSql() {
 		String ret = "";
 		String co = "";
@@ -310,6 +350,11 @@ public abstract class TableInfo{
 		return "delete "+this.getTableName()+" where "+(where==null||where.equals("")?(getKeyColumn().name+"=?"):where);
 	}
 	
-	protected abstract String getHisFunction();
+	protected abstract List<String> getHisFunction();
+	
+	protected abstract String getPageSql();
+	
+	protected abstract String getClassDriver();
+	
 }
 

@@ -17,66 +17,6 @@ import supernate.core.tags.Table;
 
 
 public class TableInfo extends supernate.core.TableInfo{
-	@SuppressWarnings("unchecked")
-	protected TableInfo initWithClass(Class z) {
-		TableInfo ret = null;
-		//this.setTableName(z.getSimpleName());
-		if(z.isAnnotationPresent(ConnectionInfo.class)) {
-			ConnectionInfo connectionInfo = (ConnectionInfo)z.getAnnotation(ConnectionInfo.class);
-			supernate.core.ConnectionInfo info = new supernate.core.ConnectionInfo();
-			info.setDriver(connectionInfo.driver());
-			info.setPassword(connectionInfo.password());
-			info.setUrl(connectionInfo.url());
-			info.setUsername(connectionInfo.username());
-			ret.setConnectionInfo(info);
-		}
-		Class<?> clazz = z ; 
-		for(; clazz != Object.class ; clazz = clazz.getSuperclass()) {  
-            try {  
-        		if(clazz.isAnnotationPresent(Table.class)) {
-        			Table tableinfo = (Table) clazz.getAnnotation(Table.class);
-        			if(!tableinfo.name().equals("")) {
-        				ret.setTableName(tableinfo.name());
-        			}else {
-        				ret.setTableName(clazz.getSimpleName());
-        			}
-        			ret.setComment(tableinfo.comment());
-        		}
-            } catch (Exception e) {  
-                //这里甚么都不能抛出去。  
-                //如果这里的异常打印或者往外抛，则就不会进入                  
-            }   
-        }  
-		if(ret.getTableName().equals("")) {
-			logger.error("there's no table tag,please add it to class tag");
-		}
-		ret.initcolumns(z);
-		return ret;
-	}
-	
-	protected TableInfo initWithDatabase(Entity et,int id) {
-		TableInfo ret = null;
-		try {
-			Entity<TableInfo> ti = new Entity<TableInfo>(et.getConn());
-			ret = ti.getByClassKey(TableInfo.class,id);
-			Entity<ColumnInfo> cos = new Entity<ColumnInfo>(et.getConn());
-			List<ColumnInfo> colist = cos.getObjects(ColumnInfo.class,"tablename=?", ret.getTableName());
-			for(int i = 0;i<colist.size();i++) {
-				ColumnInfo co = colist.get(i);
-				columns.add(co);
-				if(co.isAi()) {
-					autos.add(co);
-				}
-				if(co.isKey()) {
-					keyColumn = co;
-				}
-			}
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        return ret;
-	}
 	
 	protected List<String> getInitSql(boolean createhis){
 		List<String> ret = new ArrayList<String>();
@@ -86,18 +26,23 @@ public class TableInfo extends supernate.core.TableInfo{
 		String temp1="CREATE TABLE "+this.tableName.toUpperCase()+"(",temp2="CREATE TABLE "+this.tableName.toUpperCase()+"_HIS(";
 		for(int i = 0;i<columns.size();i++) {
 			supernate.core.ColumnInfo co = columns.get(i);
+			String is = co.getIndexSql(false),his=co.getIndexSql(true);
+			List<String> auf = co.getAutoSqls();
+			if(auf!=null)
+			autosf.addAll(auf);
+			if(!is.equals(""))
+			indexs.add(is);
+			if(!his.equals(""))
+			hisindes.add(his);
 			temp1+=co.getSqlString(false)+",\r\n";
-			autosf.add(co.getAutoFunctioin());
 			temp2+=co.getSqlString(true)+",\r\n";
-			indexs.add(co.getIndexSql(false));
-			hisindes.add(co.getIndexSql(true));
 		}
 		ret.add(temp1+")");
 		ret.addAll(indexs);
 		if(createhis) {
-			ret.add(temp2+")");
+			ret.add(temp2+",LOGDATE TIMESTAMP,LOGTYPE INT（1))");
 			ret.addAll(hisindes);
-			ret.add(getHisFunction());
+			ret.addAll(getHisFunction());
 		}
 		ret.addAll(autosf);
 		return ret;
@@ -176,8 +121,8 @@ public class TableInfo extends supernate.core.TableInfo{
 	}
 
 	@Override
-	protected String getHisFunction() {
-		String ret = "";
+	protected List<String> getHisFunction() {
+		List<String> ret = new ArrayList<String>();
 		// TODO Auto-generated method stubString trigerupdate = "CREATE OR REPLACE TRIGGER \"TRI_"+this.getTableName()+"_UP\"\r\n" + 
 		String trigerupdate = "";
 		String columnnames = "";
@@ -194,26 +139,39 @@ public class TableInfo extends supernate.core.TableInfo{
 			hiscolumnnames+=":NEW.\""+co.getName().toUpperCase()+"\"";
 			hisdcolumnnames+=":OLD.\""+co.getName().toUpperCase()+"\"";
 		}
+		trigerupdate = "CREATE OR REPLACE TRIGGER \"TRI_"+this.getTableName()+"_UPDATE\"\r\n";
 		trigerupdate += "BEFORE UPDATE\r\n"  +
 		"ON "+this.getTableName()+" FOR EACH ROW\r\n" + 
 		"BEGIN\r\n" + 
 		"	INSERT into "+this.getTableName()+"_HIS ("+columnnames+",LOGDATE,LOGTYPE) values("+hiscolumnnames+",sysdate,1);\r\n" + 
 		"END;;\r\n";
-		ret+=trigerupdate;
+		ret.add(trigerupdate);
         String trigerinsert = "CREATE OR REPLACE TRIGGER \"TRI_"+this.getTableName()+"_INS\"\r\n" + 
 		"BEFORE INSERT\r\n" + 
 		"ON "+this.getTableName()+" FOR EACH ROW\r\n" + 
 		"BEGIN\r\n" + 
 		"	INSERT into "+this.getTableName()+"_HIS ("+columnnames+",LOGDATE,LOGTYPE) values("+hiscolumnnames+",sysdate,0);\r\n" + 
 		"END;;\r\n";
-		ret+=trigerinsert;
+		ret.add(trigerinsert);
         String trigerindel = "CREATE OR REPLACE TRIGGER \"TRI_"+this.getTableName()+"_DEL\"\r\n" + 
 		"BEFORE DELETE\r\n" + 
 		"ON "+this.getTableName().toUpperCase()+" FOR EACH ROW\r\n" + 
 		"BEGIN\r\n" + 
 		"	INSERT into "+this.getTableName().toUpperCase()+"_HIS ("+columnnames+",LOGDATE,LOGTYPE) values("+hisdcolumnnames+",sysdate,2);\r\n" + 
 		"END;;\r\n";
-		ret+=trigerindel;
+		ret.add(trigerindel);
 		return ret;
+	}
+
+	@Override
+	protected String getPageSql() {
+		// TODO Auto-generated method stub
+		return "SELECT * FROM ( SELECT A.*, ROWNUM RN  FROM ({sql}) A  WHERE ROWNUM <= ?)WHERE RN >= ?";
+	}
+	
+	@Override
+	protected String getClassDriver() {
+		// TODO Auto-generated method stub
+		return "oracle.jdbc.driver.OracleDriver";
 	}
 }

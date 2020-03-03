@@ -5,6 +5,8 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.sxkj.jutils.TimestampHelper;
 
@@ -108,8 +110,10 @@ public class ColumnInfo extends supernate.core.ColumnInfo{
 	}
 
 	@Override
-	public String getAutoFunctioin() {
+	public List<String> getAutoFunctioin() {
 		// TODO Auto-generated method stub
-		return "CREATE SEQUENCE "+this.tableName.toUpperCase()+"_"+this.getName()+"_SEQUENCE INCREMENT 1 MINVALUE 1 START 1 NO CACHE  NO CYCLE;";
+		List<String> ret = new ArrayList<String>();
+		ret.add("CREATE SEQUENCE "+this.tableName.toUpperCase()+"_"+this.getName()+"_SEQUENCE INCREMENT 1 MINVALUE 1 START 1 NO CACHE  NO CYCLE;");
+		return ret;
 	}
 }

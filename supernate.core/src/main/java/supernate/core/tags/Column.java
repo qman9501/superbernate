@@ -37,7 +37,7 @@ public @interface Column {
     /**
      * (Optional) Whether the database column is nullable.
      */
-    boolean nullable() default false;
+    boolean nullable() default true;
 
     /**
      * (Optional) The column length. (Applies only if a

@@ -12,6 +12,8 @@
     <module>supernate.oscarDialect</module>
     <module>supernate.mysqlDialect</module>
     <module>supernate.oracleDialect</module>
+    <module>supernate.sample</module>
+    <module>supernate.mariadbDialect</module>
   </modules>
   <dependencies>
   	<dependency>

@@ -5,6 +5,7 @@ package supernate.core;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.util.List;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -188,7 +189,7 @@ import supernate.core.tags.Table;
 		@Column(name="COLUMNNAME")
 		protected String name;
 		@Column(name="ISAI")
-		protected int ai;
+		protected int ai=0;
 		@Column(name="ISUNIQUE")
 		protected int unique;
 		@Column(name="ISNULLABLE")
@@ -333,5 +334,12 @@ import supernate.core.tags.Table;
 		
 		public abstract Object getAutoValue(Entity et);
 		
-		public abstract String getAutoFunctioin();
+		public abstract List<String> getAutoFunctioin();
+		public List<String> getAutoSqls(){
+			if(this.isAi()) {
+				return this.getAutoFunctioin();
+			}else {
+				return null;
+			}
+		}
 	}

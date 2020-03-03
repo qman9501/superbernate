@@ -5,8 +5,9 @@
     <artifactId>supernate</artifactId>
     <version>0.0.1</version>
   </parent>
-  <artifactId>supernate.mysqlDialect</artifactId>
-  <name>mysqlDialect</name>
+  <artifactId>supernate.sample</artifactId>
+  <name>sample</name>
+  <description>the mysql sample</description>
   <dependencies>
   	<dependency>
   		<groupId>org.springframework</groupId>
@@ -23,5 +24,15 @@
 		    <artifactId>supernate.core</artifactId>
 		    <version>0.0.1</version>
 		</dependency>
+		<dependency>
+		    <groupId>com.sxkj</groupId>
+		    <artifactId>supernate.mariadbDialect</artifactId>
+		    <version>0.0.1</version>
+		</dependency>
+		<dependency>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+            <version>2.5.4</version>
+        </dependency>
   </dependencies>
 </project>
