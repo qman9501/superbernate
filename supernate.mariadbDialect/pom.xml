@@ -1,0 +1,27 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.sxkj</groupId>
+    <artifactId>supernate</artifactId>
+    <version>0.0.1</version>
+  </parent>
+  <artifactId>supernate.mariadbDialect</artifactId>
+  <name>mariadbDialect</name>
+  <dependencies>
+  	<dependency>
+  		<groupId>org.springframework</groupId>
+  		<artifactId>spring-core</artifactId>
+  		<version>2.5.6</version>
+  	</dependency>
+		<dependency>
+		    <groupId>org.apache.commons</groupId>
+		    <artifactId>commons-collections4</artifactId>
+		    <version>4.2</version>
+		</dependency>
+		<dependency>
+		    <groupId>com.sxkj</groupId>
+		    <artifactId>supernate.core</artifactId>
+		    <version>0.0.1</version>
+		</dependency>
+  </dependencies>
+</project>
