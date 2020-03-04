@@ -8,11 +8,6 @@
   <artifactId>supernate.mysqlDialect</artifactId>
   <name>mysqlDialect</name>
   <dependencies>
-  	<dependency>
-  		<groupId>org.springframework</groupId>
-  		<artifactId>spring-core</artifactId>
-  		<version>2.5.6</version>
-  	</dependency>
 		<dependency>
 		    <groupId>org.apache.commons</groupId>
 		    <artifactId>commons-collections4</artifactId>
