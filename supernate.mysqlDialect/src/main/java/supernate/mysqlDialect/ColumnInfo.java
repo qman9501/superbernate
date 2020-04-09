@@ -63,6 +63,7 @@ public class ColumnInfo extends supernate.core.ColumnInfo{
 				this.setLength("1,0");
 				break;
 		}
+		this.type=type;
 	}
 
 	@Override
@@ -95,7 +96,7 @@ public class ColumnInfo extends supernate.core.ColumnInfo{
 		Statement stkey;
 		try {
 			stkey = et.getConn().createStatement();
-		    ResultSet rs=stkey.executeQuery("select "+this.getTableName()+"_SEQUENCE.nextval from dual");
+		    ResultSet rs=stkey.executeQuery("select "+this.getTableName()+"_"+this.getName()+"_nextval() from dual");
 		    if(rs.next()){
 		    	ret=rs.getObject(1);
 	        }

@@ -53,6 +53,7 @@ public class ColumnInfo extends supernate.core.ColumnInfo{
 				this.setSqlType("INT1");
 				break;
 		}
+		this.type=type;
 	}
 
 	@Override

@@ -1,4 +1,4 @@
-package supernate.oscarDialectsupernate.oscarDialect;
+package supernate.oscarDialect;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -53,6 +53,7 @@ public class ColumnInfo extends supernate.core.ColumnInfo{
 				this.setSqlType("INT1");
 				break;
 		}
+		this.type=type;
 	}
 
 	@Override

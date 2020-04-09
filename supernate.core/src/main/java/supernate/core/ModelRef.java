@@ -33,13 +33,17 @@ public class ModelRef {
 		return true;
 	}
 	
-	public static void CopyProperties(Object source,Object desi,String notcopy) {
+	public static void CopyProperties(Object source,Object desi,String... notcopy) {
 		Class a = source.getClass();
 		Class b = desi.getClass();
 		List<Field> fields = getDeclaredFields(source);
 		for(Field fi :fields) {
-			if(notcopy.contains(fi.getName()))
-				continue;
+			if(notcopy!=null) {
+				for(String e:notcopy) {
+					if(notcopy.equals(fi.getName()))
+						continue;
+				}
+			}
 			try {
 				setFieldValue(desi,fi.getName(),getFieldValue(source,fi.getName()));
 			}catch(Exception e) {

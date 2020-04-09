@@ -294,7 +294,7 @@ import supernate.core.tags.Table;
 			try {
 				Field field = ReflectionUtils.findField(z, fieldName);
 				field.setAccessible(true);
-				field.set(obj, value);
+				field.set(obj, ModelRef.paseType(field.getGenericType().getTypeName(),value));
 			} catch (Exception e) {
 				logger.log(Level.ERROR,e.getMessage());
 			}
@@ -303,6 +303,7 @@ import supernate.core.tags.Table;
 			Class z = obj.getClass();
 			try {
 				Field field = ReflectionUtils.findField(z, fieldName);
+				field.setAccessible(true);
 				this.setValue(field.get(obj));
 			} catch (Exception e) {
 				logger.log(Level.ERROR,e.getMessage());
@@ -313,6 +314,7 @@ import supernate.core.tags.Table;
 			Class z = obj.getClass();
 			try {
 				Field field = ReflectionUtils.findField(z, fieldName);
+				field.setAccessible(true);
 				return field.get(obj);
 			} catch (Exception e) {
 				logger.log(Level.ERROR,e.getMessage());

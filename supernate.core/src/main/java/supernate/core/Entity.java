@@ -28,6 +28,8 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+
 /**
  * @author Administrator
  *
@@ -77,7 +79,7 @@ public class Entity<T> {
 			return;
 		}
 	}
-	public Entity(Connection conn,String packageStr)  {
+	public Entity(Connection conn,String packageStr) throws Exception  {
 		this.setDialectPackage(packageStr);
 		init();
 		Class z = this.getClass();
@@ -87,16 +89,33 @@ public class Entity<T> {
 		}
 		this.tableInfo = this.baseTableInfo.initWithClass(z);
 	}
+	private static ComboPooledDataSource ds = null;
+	
 	public Entity(String url,String username,String password,String packageStr) throws Exception {
 
 		this.setDialectPackage(packageStr);
 		init();
+		initconnection(url,username,password);
 		Class z = this.getClass();
-		this.conn = DriverManager.getConnection(url, username, password);
+		//this.conn = DriverManager.getConnection(url, username, password);
 		if(z==Entity.class) {
 			return;
 		}
 		this.tableInfo = this.baseTableInfo.initWithClass(z);
+	}
+	
+	private synchronized void initconnection(String url,String username,String password) throws Exception {
+		if(ds==null) {
+			ds = new ComboPooledDataSource();
+			ds.setJdbcUrl(url);
+			ds.setUser(username);
+			ds.setPassword(password);
+			ds.setInitialPoolSize(10);
+			ds.setMinPoolSize(10);
+			ds.setMaxPoolSize(100);
+			ds.setDriverClass(this.baseTableInfo.getClassDriver());
+		}
+		this.conn = ds.getConnection(username,password);
 	}
 	
 	private void init() {
@@ -125,11 +144,11 @@ public class Entity<T> {
 	public TableInfo getTableInfo() {
 		return this.tableInfo;
 	}
-	public TableInfo getTableInfo(Class z){
+	public TableInfo getTableInfo(Class z) throws Exception{
 		return baseTableInfo.initWithClass(z);
 	}
 	
-	public void InitTable(boolean createhis) {
+	public void InitTable(boolean createhis) throws Exception {
 		if(this.baseTableInfo==null) {
 			logger.log(Level.ERROR, "There are no Dialect!");
 			return;
@@ -151,9 +170,11 @@ public class Entity<T> {
 			try {
 				this.conn.rollback();
 				logger.log(Level.ERROR, ex.getMessage()+"\r\n"+ex.getStackTrace());
+				throw ex;
 			} catch (SQLException e) {
 				// TODO Auto-generated catch block
 				logger.log(Level.ERROR, e.getMessage()+"\r\n"+ex.getStackTrace());
+				throw e;
 			}
 		}
 	}
@@ -178,7 +199,7 @@ public class Entity<T> {
 		}
 	}
 
-	public void InitTable(Class z,boolean createhis) {
+	public void InitTable(Class z,boolean createhis) throws Exception {
 		TableInfo tableInfo = baseTableInfo.initWithClass(z);
 		List<String> sqls = tableInfo.getInitSql(createhis);
 		try {
@@ -200,47 +221,47 @@ public class Entity<T> {
 		}
 	}
 	
-	public void insert(){
+	public void insert() throws Exception{
 		TableInfo tableInfo = baseTableInfo.initWithObject(this);
 		tableInfo.setEntity(this);
 		tableInfo.Insert();
 	}	
 	
-	public void insert(Object t){
+	public void insert(Object t) throws Exception{
 		TableInfo tableInfo = baseTableInfo.initWithObject(t);
 		tableInfo.setEntity(this);
 		tableInfo.Insert();
 	}	
 	
-	public void update(){
+	public void update() throws Exception{
 		TableInfo tableInfo = baseTableInfo.initWithObject(this);
 		tableInfo.setEntity(this);
 		tableInfo.Update();
 	}
 	
-	public void update(Object t){
+	public void update(Object t) throws Exception{
 		TableInfo tableInfo = baseTableInfo.initWithObject(t);
 		tableInfo.setEntity(this);
 		tableInfo.Update();
 	}
 
-	public void update(String where,Object...objects){
+	public void update(String where,Object...objects) throws Exception{
 		TableInfo tableInfo = baseTableInfo.initWithObject(this);
 		tableInfo.setEntity(this);
 		tableInfo.Update(where,objects);
 	}
 
-	public void delete(String where,Object...objects){
+	public void delete(String where,Object...objects) throws Exception{
 		TableInfo tableInfo = baseTableInfo.initWithObject(this);
 		tableInfo.setEntity(this);
 		tableInfo.Delete(where,objects);
 	}
-	public void delete(Object t) {
+	public void delete(Object t) throws Exception {
 		TableInfo tableInfo = baseTableInfo.initWithObject(t);
 		tableInfo.setEntity(this);
 		tableInfo.Delete();
 	}
-	public void delete() {
+	public void delete() throws Exception {
 		TableInfo tableInfo = baseTableInfo.initWithObject(this);
 		tableInfo.setEntity(this);
 		tableInfo.Delete();
@@ -255,7 +276,7 @@ public class Entity<T> {
 		return ret;
 	}
 	
-	public T getByClassKey(Class z,Object id){
+	public T getByClassKey(Class z,Object id) throws Exception{
         T ret = null;
         this.tableInfo = baseTableInfo.initWithClass(z);
 		List<Object> ls = this.Query(z,"select * from "+this.tableInfo.getTableName()+" where "+this.tableInfo.getKeyColumn().getName()+"=?", id);
@@ -264,7 +285,7 @@ public class Entity<T> {
 		return ret;
 	}
 	
-	public Object getByKey(Class z,Object id) {
+	public Object getByKey(Class z,Object id) throws Exception {
 		this.tableInfo = baseTableInfo.initWithClass(z);
         Object ret;
 		try {
@@ -279,7 +300,7 @@ public class Entity<T> {
 		}
 	}
 
-	public PageRecords<T> getObjectsByPage(Class z,String where,int pageNum,int pageSize,Object...objects) {
+	public PageRecords<T> getObjectsByPage(Class z,String where,int pageNum,int pageSize,Object...objects) throws Exception {
 		this.tableInfo = baseTableInfo.initWithClass(z);
 		String sql = "";
 		int startNumber = (pageNum-1)*pageSize+1;
@@ -441,7 +462,7 @@ public class Entity<T> {
 	}
 	
 	
-	public void Excutesql(String sql,Object...objects) {
+	public void Excutesql(String sql,Object...objects) throws SQLException {
 		try {
 			PreparedStatement st = conn.prepareStatement(sql);
 			if(objects!=null&&objects.length>0) {
@@ -460,11 +481,11 @@ public class Entity<T> {
 		}catch(SQLException ex) {
 			System.out.println(sql);
 			logger.error(ex);
-			
+			throw ex;
 		}
 	}
 
-	public List<Object> Query(Class z,String sql,Object...objects) {
+	public List<Object> Query(Class z,String sql,Object...objects) throws Exception {
 		try {
 			PreparedStatement st = conn.prepareStatement(sql);
 			if(objects!=null&&objects.length>0) {
@@ -488,17 +509,17 @@ public class Entity<T> {
 			return ret;
 		}catch(SQLException e) {
 			logger.log(Level.ERROR, e.getMessage());
-			return null;
+			throw e;
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			logger.error(e);
-			return null;
+			throw e;
 		} catch (IllegalAccessException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			logger.error(e);
-			return null;
+			throw e;
 		}
 	}
 	
@@ -635,7 +656,7 @@ public class Entity<T> {
 		int record = GetRecordCoundBysql("select count(*) from user_tables where table_name=?",this.tableInfo.getTableName());
 		return record==1?false:true;
 	}
-	public boolean checkTable(Class z) {
+	public boolean checkTable(Class z) throws Exception {
 		TableInfo tableInfo = baseTableInfo.initWithClass(z);
 		int record = GetRecordCoundBysql("select count(*) from user_tables where table_name=?",tableInfo.getTableName());
 		return record==1?false:true;
@@ -643,6 +664,7 @@ public class Entity<T> {
 	
 	public void close() {
 		try {
+			this.conn.commit();
 			this.conn.close();
 		} catch (SQLException e) {
 			logger.log(Level.ERROR, e.getMessage());

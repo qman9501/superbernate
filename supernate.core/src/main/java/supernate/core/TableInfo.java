@@ -9,6 +9,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +44,7 @@ public abstract class TableInfo{
 		// TODO Auto-generated constructor stub
 	}
 	
-	protected TableInfo initWithClass(Class z) {
+	protected TableInfo initWithClass(Class z) throws Exception {
 		TableInfo ret=null;
 		try {
 			ret = this.getClass().newInstance();
@@ -71,12 +72,12 @@ public abstract class TableInfo{
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			logger.error(e);
-			e.printStackTrace();
+			throw e;
 		}
 		return ret;
 	}
 	
-	protected TableInfo initWithObject(Object obj) {
+	protected TableInfo initWithObject(Object obj) throws Exception {
 		TableInfo ret = null;
 		Class<?> clazz = obj.getClass() ; 
 		ret = initWithClass(clazz);
@@ -87,7 +88,7 @@ public abstract class TableInfo{
 		return ret;
 	}
 	
-	protected TableInfo initWithDatabase(int id) {
+	protected TableInfo initWithDatabase(int id) throws Exception {
 		TableInfo ret = null;
 		try {
 			ret = this.getClass().newInstance();
@@ -108,6 +109,7 @@ public abstract class TableInfo{
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			throw e;
 		}
         return ret;
 	}
@@ -124,11 +126,11 @@ public abstract class TableInfo{
 			return null;
 	}
 	
-	public void Delete() {
+	public void Delete() throws Exception {
 		this.Delete(null);
 	}
 	
-	public void Delete(String where,Object... params) {
+	public void Delete(String where,Object... params) throws Exception {
 			try {
 				if(where==null) {
 					String sql = this.getDeleteSql(null);
@@ -139,15 +141,16 @@ public abstract class TableInfo{
 				}
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				logger.error(e);
+				throw e;
 			}
 	}
 	
-	public void Update() {
+	public void Update() throws Exception {
 		Update(null);
 	}
 	
-	public void Update(String where,Object... params) {
+	public void Update(String where,Object... params) throws Exception {
 		try {
 			String sql = "";
 			Object[] pas = null;
@@ -175,12 +178,12 @@ public abstract class TableInfo{
 			entity.Excutesql(sql, pas);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
 			logger.error(e);
+			throw e;
 		}
 	}
 
-	public void Insert() {
+	public void Insert() throws SQLException {
 		String sql = this.getInsertSql();
 		Object[] params = new Object[this.columns.size()];
 		int i = 0;
@@ -321,7 +324,7 @@ public abstract class TableInfo{
 					ret+=",";
 					co+=",";
 				}
-				ret+="\""+columns.get(i).getName().toUpperCase()+"\"";
+				ret+=columns.get(i).getName().toUpperCase();
 				co+="?";
 		}
 		return "insert into "+this.getTableName()+" ("+ret+") values ("+co+")";
@@ -335,7 +338,7 @@ public abstract class TableInfo{
 				if(!ret.equals("")) {
 					ret+=",";
 				}
-				ret+="\""+columns.get(i).getName().toUpperCase()+"\"=?";
+				ret+=columns.get(i).getName().toUpperCase();
 			}
 		}
 		if(this.getKeyColumn()==null&&(where==null||where.equals("")))
